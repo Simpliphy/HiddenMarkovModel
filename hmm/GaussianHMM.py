@@ -16,9 +16,10 @@ class GaussianHMM(baseHMM):
     """
     def __init__(self, number_of_states):
 
+        super().__init__()
+
         self._parameters = list()
         self._number_of_possible_states = number_of_states
-        super().__init__()
 
     def generate_sample(self, number_of_data):
         """
@@ -68,7 +69,7 @@ class GaussianHMM(baseHMM):
 
     @property
     def transition_probabilities(self):
-        return self._initial_state
+        return self._transition_probabilitities
 
     @transition_probabilities.setter
     def transition_probabilities(self, transition_matrix):
@@ -82,7 +83,7 @@ class GaussianHMM(baseHMM):
         assert transition_matrix.min() >= 0, "all value must be positive"
         assert transition_matrix.max() <= 1, "all value must be lower or equal to one"
 
-        self._initial_state = transition_matrix
+        self._transition_probabilitities = transition_matrix
 
     @property
     def emission_probabilities_parameters(self):
@@ -96,7 +97,7 @@ class GaussianHMM(baseHMM):
         :param parameters:
         :return:
         """
-        assert isinstance(parameters, list), "A list is expected"
+        assert isinstance(parameters, np.ndarray), "A numpy array is expected"
         for combinaison in parameters:
             assert len(combinaison) == 2, "Two elements are expected per state"
             assert combinaison[1] >= 0, "The sigma must be positive"
@@ -110,9 +111,11 @@ class GaussianHMM(baseHMM):
         assert self._initial_state is not None, "inital state must be initialized"
         assert self._transition_probabilitities is not None, "Transition probabilities mst be initialized"
         assert self._parameters is not None, "The parameters for the emission probabilities must be defined"
+        assert self._number_of_possible_states is not None
+
 
     def _get_initial_state_index(self):
-        return np.argmax(self.initial_state)
+        return int(np.argmax(self.initial_state))
 
     def _emit_value(self, state):
 
@@ -138,6 +141,7 @@ class GaussianHMM(baseHMM):
 
         transition_probabilities = self.transition_probabilities[current_state]
         new_state = np.random.choice(self._number_of_possible_states, p=transition_probabilities)
+        new_state = int(new_state)
 
         return new_state
 

@@ -26,23 +26,23 @@ class baseHMM(object):
     def _do_E_step(self):
         raise NotImplementedError
 
-    @abstractmethod
     @property
+    @abstractmethod
     def transition_probabilities(self):
         raise NotImplementedError
 
-    @abstractmethod
     @transition_probabilities.setter
+    @abstractmethod
     def transition_probabilities(self, value):
         raise NotImplementedError
 
-    @abstractmethod
     @property
+    @abstractmethod
     def emission_probabilities_parameters(self):
         raise NotImplementedError
 
-    @abstractmethod
     @emission_probabilities_parameters.setter
+    @abstractmethod
     def emission_probabilities_parameters(self, value):
         raise NotImplementedError
 
