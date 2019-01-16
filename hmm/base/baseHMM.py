@@ -19,11 +19,11 @@ class baseHMM(object):
         raise NotImplementedError
 
     @abstractmethod
-    def _do_M_step(self):
+    def _do_M_step(self, observation):
         raise NotImplementedError
 
     @abstractmethod
-    def _do_E_step(self):
+    def _do_E_step(self, observations):
         raise NotImplementedError
 
     @property
