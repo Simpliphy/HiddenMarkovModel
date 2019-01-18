@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import multivariate_normal
 import math
 from numpy.linalg import det
-
+from tqdm import tqdm
 
 class GaussianSoftClustering(object):
     """
@@ -11,7 +11,7 @@ class GaussianSoftClustering(object):
 
     def __init__(self):
 
-        raise NotImplementedError
+        self._nothing = None
 
     def gauss_den(self, x, mu, sigma, d):
         """
@@ -84,7 +84,6 @@ class GaussianSoftClustering(object):
         return pi, mu, sigma
 
 
-
     def compute_vlb(self, X, pi, mu, sigma, gamma):
         """
         Each input is numpy array:
@@ -130,40 +129,50 @@ class GaussianSoftClustering(object):
         N = X.shape[0]  # number of objects
         d = X.shape[1]  # dimension of each object
 
-        pi = 1 / float(C) * np.ones(C)
-        mu = np.random.randn(C, d)
-        sigma = np.zeros((C, d, d))
-        sigma[...] = np.identity(d)
+       # pi = 1 / float(C) * np.ones(C)
+      #  mu = np.random.randn(C, d)
+       # sigma = np.zeros((C, d, d))
+       # sigma[...] = np.identity(d)
 
         best_loss = -1e7
         best_pi = None
         best_mu = None
         best_sigma = None
+        best_gamma = None
 
         for _ in range(restarts):
-            try:
-                ### YOUR CODE HERE
-                pi = 1 / float(C) * np.ones(C)
-                mu = np.random.randn(C, d)
-                sigma = np.zeros((C, d, d))
-                sigma[...] = np.identity(d)
+            #print("restart")
+           # try:
 
-                for it in range(max_iter):
+            pi = 1 / float(C) * np.ones(C)
+            mu = np.random.randn(C, d)
+            sigma = np.zeros((C, d, d))
+            sigma[...] = np.identity(d)
 
-                    gamma = self.E_step(X, pi, mu, sigma)
-                    pi, mu, sigma = self.M_step(X, gamma)
-                    loss = self.compute_vlb(X, pi, mu, sigma, gamma)
-                    if loss / prev_loss < rtol:
-                        break
-                    if loss > best_loss:
-                        # print loss
-                        best_loss = loss
-                        best_pi = np.copy(pi)
-                        best_mu = np.copy(mu)
-                        best_sigma = np.copy(sigma)
+            gamma = self.E_step(X, pi, mu, sigma)
+            prev_loss = self.compute_vlb(X, pi, mu, sigma, gamma)
 
-            except np.linalg.LinAlgError:
-                print("Singular matrix: components collapsed")
-                pass
+            for _ in tqdm(range(max_iter)):
 
-        return best_loss, best_pi, best_mu, best_sigma
+                gamma = self.E_step(X, pi, mu, sigma)
+                pi, mu, sigma = self.M_step(X, gamma)
+                loss = self.compute_vlb(X, pi, mu, sigma, gamma)
+                if loss / prev_loss < rtol:
+                    break
+                if loss > best_loss:
+                    # print loss
+                    best_loss = loss
+                    best_pi = np.copy(pi)
+                    best_mu = np.copy(mu)
+                    best_sigma = np.copy(sigma)
+                    best_gamma = np.copy(gamma)
+
+                prev_loss = loss
+                #print("step %d" % it)
+
+           # except np.linalg.LinAlgError:
+            #    print("Singular matrix: components collapsed")
+            #    pass
+
+        return best_loss, best_pi, best_mu, best_sigma, best_gamma
+

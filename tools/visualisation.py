@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_observations_with_states(observations, states):
+def plot_observations_with_states(observations, states, ax = None):
 
     if not isinstance(observations, np.ndarray):
         observations = np.array(observations)
@@ -15,7 +15,10 @@ def plot_observations_with_states(observations, states):
     number_of_observation = len(observations)
     observations_index = np.array(range(number_of_observation))
 
-    plt.plot(observations_index, observations, "k-")
+    if ax is None:
+        f, ax = plt.subplots()
+
+    ax.plot(observations_index, observations, "k-")
 
     for state_index in possible_states:
 
@@ -24,11 +27,11 @@ def plot_observations_with_states(observations, states):
         x = observations_index[indexes_for_state]
         y = observations[indexes_for_state]
 
-        plt.plot(x, y, ".", label=state_index, markersize=10)
+        ax.plot(x, y, ".", label=state_index, markersize=10)
 
-    plt.ylabel("observations")
-    plt.xlabel("time step")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    ax.set_ylabel("observations")
+    ax.set_xlabel("time step")
+    ax.legend()
+
+    return ax
 
