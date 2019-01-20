@@ -40,7 +40,7 @@ class GaussianSoftClustering(object):
         d = mu.shape[1]  # dimension of each object
         gamma = np.zeros((N, C))  # distribution q(T)
 
-        ### YOUR CODE HERE
+
         # P(t|x)=p(x|t)p(t)/z
         # p(x|t)=N(mu,sigma)
         for t in range(C):
@@ -63,23 +63,23 @@ class GaussianSoftClustering(object):
         mu: (C x d)
         sigma: (C x d x d)
         """
-        N = X.shape[0]  # number of objects
-        C = gamma.shape[1]  # number of clusters
-        d = X.shape[1]  # dimension of each object
+        number_of_objects = X.shape[0]
+        number_of_clusters = gamma.shape[1]
+        number_of_features = X.shape[1]  # dimension of each object
 
-        ### YOUR CODE HERE
         normalizer = np.sum(gamma, 0)  # (K,)
         # print normalizer.shape
         mu = np.dot(gamma.T, X) / normalizer.reshape(-1, 1)
-        pi = normalizer / N
-        sigma = np.zeros((C, d, d))
+        pi = normalizer / number_of_objects
+        sigma = np.zeros((number_of_clusters, number_of_features, number_of_features))
+
         # for every k compute cov matrix
-        for k in range(C):
-            x_mu = X - mu[k]
-            gamma_diag = np.diag(gamma[:, k])
-            # print x_mu.shape,gamma_diag.shape
-            sigma_k = np.matrix(x_mu.T) * np.matrix(gamma_diag) * np.matrix(x_mu)
-            sigma[k, ...] = (sigma_k) / normalizer[k]
+        for cluster_index in range(number_of_clusters):
+            x_mu = X - mu[cluster_index]
+            gamma_diag = np.diag(gamma[:, cluster_index])
+
+            sigma_k = np.dot(np.dot(x_mu.T , gamma_diag) , x_mu)
+            sigma[cluster_index, ...] = (sigma_k) / normalizer[cluster_index]
 
         return pi, mu, sigma
 

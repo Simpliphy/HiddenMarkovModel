@@ -61,7 +61,7 @@ class GaussianHMM(baseHMM):
 
     def _do_M_step(self, observations):
         """
-
+        find parameters maximization of likelihood based on states
         :return:
         """
         print("M-step")
@@ -117,9 +117,6 @@ class GaussianHMM(baseHMM):
     def _calculate_new_emission_probabilities_parameters(self, observations):
 
         parameters = np.zeros((self._number_of_possible_states, 2))
-
-
-        
         gamma = self._states_distribution_calculation
         X = np.array([[item] for item in observations])
 
@@ -136,9 +133,9 @@ class GaussianHMM(baseHMM):
         for k in range(C):
             x_mu = X - mu[k]
             gamma_diag = np.diag(gamma[:, k])
-            # print x_mu.shape,gamma_diag.shape
-            sigma_k = np.matrix(x_mu.T) * np.matrix(gamma_diag) * np.matrix(x_mu)
-            sigma[k, ...] = (sigma_k) / normalizer[k]
+
+            sigma_k = np.dot(np.dot(x_mu.T, gamma_diag), x_mu)
+            sigma[k,...] = (sigma_k) / normalizer[k]
 
             #parameters[k, 1] = math.sqrt(np.sum(x_mu ** 2)) / normalizer[k]
         for k in range(C):
@@ -157,10 +154,16 @@ class GaussianHMM(baseHMM):
             parameters[state_index, 0] = mu
             parameters[state_index, 1] = sigma
         """
-        print(parameters)
+
         self._parameters = parameters
 
     def _do_E_step(self, observations):
+        """
+        find states most probable based on parameters
+
+        :param observations:
+        :return:
+        """
         print("E_step")
 
         number_of_observations = len(observations)
@@ -174,8 +177,10 @@ class GaussianHMM(baseHMM):
 
                 state_emission_distribution = norm(loc=state_mu, scale=state_sigma)
                 probability_of_state = state_emission_distribution.pdf(observations[index_time_step])
+
                 probability_of_state = np.nan_to_num(probability_of_state)
-                probability_of_state = max(probability_of_state, np.random.normal(1e-3,1e-4,1))
+                probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
+
                 states_distribution[index_time_step, index_state] = probability_of_state
 
         row_sums = states_distribution.sum(axis=1)
@@ -191,7 +196,6 @@ class GaussianHMM(baseHMM):
         self._train_with_expectation_maximization(observations)
 
         return self._states_distribution_calculation, self._transition_probabilitities_calculation, self._parameters
-
 
     @property
     def initial_state(self):
@@ -322,7 +326,7 @@ class GaussianHMM(baseHMM):
 
         gaussian_clustering_model = GaussianSoftClustering()
         X = np.array([[item] for item in observations])
-        best_loss, best_pi, best_mu, best_sigma, best_gamma = gaussian_clustering_model.train_EM(X, 3, restarts=10)
+        best_loss, best_pi, best_mu, best_sigma, best_gamma = gaussian_clustering_model.train_EM(X, 3, restarts=3)
 
         return best_pi, best_mu, best_sigma, best_gamma
 
