@@ -303,14 +303,13 @@ class GaussianHMM(baseHMM):
         C = gamma.shape[1]  # number of clusters
         d = X.shape[1]  # dimension of each object
 
-        ### YOUR CODE HERE
 
         loss = 0
-        for k in range(C):
+        for cluster_index in range(C):
             dist = multivariate_normal(mu[k], sigma[k], allow_singular=True)
             for n in range(N):
-                loss += gamma[n, k] * (
-                            np.log(pi[k] + 0.00001) + dist.logpdf(X[n, :]) - np.log(gamma[n, k] + 0.000001))
+                loss += gamma[n, cluster_index] * (
+                            np.log(pi[cluster_index] + 0.00001) + dist.logpdf(X[n, :]) - np.log(gamma[n, k] + 0.000001))
 
         loss = np.zeros(N)
         EPSILON = 1e-10
