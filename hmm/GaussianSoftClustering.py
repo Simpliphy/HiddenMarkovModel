@@ -3,6 +3,7 @@ from scipy.stats import multivariate_normal
 import math
 from numpy.linalg import det
 from tqdm import tqdm
+from hmm.GaussianSoftClusteringParameters import GaussianSoftClusteringParameters
 
 class GaussianSoftClustering(object):
     """
@@ -68,7 +69,7 @@ class GaussianSoftClustering(object):
 
         return pi, mu, sigma
 
-    def compute_vlb(self, X, pi, mu, sigma, gamma):
+    def compute_vlb(self, observations, pi, mu, sigma, gamma):
         """
         Each input is numpy array:
         X: (N x d), data points
@@ -79,12 +80,12 @@ class GaussianSoftClustering(object):
 
         Returns value of variational lower bound
         """
-        number_of_observations = X.shape[0]
+        number_of_observations = observations.shape[0]
         number_of_clusters = gamma.shape[1]
 
         loss_per_observation = np.zeros(number_of_observations)
         for k in range(number_of_clusters):
-            loss_per_observation += gamma[:, k] * (np.log(pi[k]) + multivariate_normal.logpdf(X, mean=mu[k, :], cov=sigma[k, ...]))
+            loss_per_observation += gamma[:, k] * (np.log(pi[k]) + multivariate_normal.logpdf(observations, mean=mu[k, :], cov=sigma[k, ...]))
             loss_per_observation -= gamma[:, k] * np.log(gamma[:, k])
 
         total_loss = np.sum(loss_per_observation)
@@ -101,28 +102,34 @@ class GaussianSoftClustering(object):
         C: int, number of clusters
         '''
         number_of_features = observations.shape[1]  # dimension of each object
+        number_of_observations = observations.shape[0]
 
         best_loss = -1e7
-        best_pi = None
-        best_mu = None
-        best_sigma = None
-        best_gamma = None
+        best_parameters = GaussianSoftClusteringParameters()
 
         for _ in range(restarts):
 
-            pi = 1 / float(number_of_clusters) * np.ones(number_of_clusters)
-            mu = np.random.randn(number_of_clusters, number_of_features)
-            sigma = np.zeros((number_of_clusters, number_of_features, number_of_features))
-            sigma[...] = np.identity(number_of_features)
+            parameters = GaussianSoftClusteringParameters()
+            parameters.initialize_parameters( number_of_clusters, number_of_features, number_of_observations)
 
-            gamma = self.E_step(observations, pi, mu, sigma)
-            prev_loss = self.compute_vlb(observations, pi, mu, sigma, gamma)
+            parameters.gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
+
+            prev_loss = self.compute_vlb(observations,
+                                         parameters.pi,
+                                         parameters.mu,
+                                         parameters.sigma,
+                                         parameters.gamma)
 
             for _ in tqdm(range(max_iter)):
 
-                gamma = self.E_step(observations, pi, mu, sigma)
-                pi, mu, sigma = self.M_step(observations, gamma)
-                loss = self.compute_vlb(observations, pi, mu, sigma, gamma)
+                gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
+                parameters.pi, parameters.mu, parameters.sigma = self.M_step(observations, gamma)
+
+                loss = self.compute_vlb(observations,
+                                        parameters.pi,
+                                        parameters.mu,
+                                        parameters.sigma,
+                                        parameters.gamma)
 
                 if loss / prev_loss < rtol:
                     break
@@ -130,12 +137,9 @@ class GaussianSoftClustering(object):
                 if loss > best_loss:
 
                     best_loss = loss
-                    best_pi = np.copy(pi)
-                    best_mu = np.copy(mu)
-                    best_sigma = np.copy(sigma)
-                    best_gamma = np.copy(gamma)
+                    best_parameters = parameters
 
                 prev_loss = loss
 
-        return best_loss, best_pi, best_mu, best_sigma, best_gamma
+        return best_loss, best_parameters.pi, best_parameters.mu, best_parameters.sigma, best_parameters.gamma
 
