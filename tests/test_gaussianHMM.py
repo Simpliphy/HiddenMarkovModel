@@ -66,7 +66,6 @@ def test_generate_sample(gaussian_hmm):
 def test_initialization(gaussian_hmm):
 
     observations = np.load("observation_test.npy")
-    #gaussian_hmm.fit(observations)
 
     best_pi, best_mu, best_sigma, best_gamma = gaussian_hmm._calculate_initial_states_distribution(observations)
 
@@ -127,9 +126,10 @@ def test_calculate_new_emission_probabilities_parameters(gaussian_hmm):
 
     assert 2.9 <= parameters[0][0] <= 3.1
 
-def test_train_with_expectation_maximization(gaussian_hmm):
-    assert False
-
 def test_variational_lower_bound(gaussian_hmm):
-    assert False
+
+    observations = np.load("observation_test.npy")
+    lower_bound = gaussian_hmm._calculate_variational_lower_bound(observations)
+
+    assert lower_bound <= 0.0
 

@@ -1,8 +1,7 @@
 import numpy as np
 import numbers
-from scipy.stats import norm, multivariate_normal
+from scipy.stats import norm
 import math
-from numpy.linalg import det
 from tqdm import tqdm
 
 from hmm.base.baseHMM import baseHMM
@@ -64,7 +63,6 @@ class GaussianHMM(baseHMM):
         find parameters maximization of likelihood based on states
         :return:
         """
-        print("M-step")
 
         self._calculate_new_transition_matrix(observations)
         self._calculate_new_emission_probabilities_parameters(observations)
@@ -117,43 +115,24 @@ class GaussianHMM(baseHMM):
     def _calculate_new_emission_probabilities_parameters(self, observations):
 
         parameters = np.zeros((self._number_of_possible_states, 2))
-        gamma = self._states_distribution_calculation
-        X = np.array([[item] for item in observations])
+        number_of_hidden_states = self._states_distribution_calculation.shape[1]  # number of clusters
 
-        N = X.shape[0]  # number of objects
-        C = gamma.shape[1]  # number of clusters
-        d = X.shape[1]  # dimension of each object
+        mu = np.zeros(number_of_hidden_states)
+        sigma = np.zeros(number_of_hidden_states)
 
-        normalizer = np.sum(gamma, 0)  # (K,)
-        # print normalizer.shape
-        mu = np.dot(gamma.T, X) / normalizer.reshape(-1, 1)
-        pi = normalizer / N
-        sigma = np.zeros((C, d, d))
-        # for every k compute cov matrix
-        for k in range(C):
-            x_mu = X - mu[k]
-            gamma_diag = np.diag(gamma[:, k])
+        for index_state in range(number_of_hidden_states):
 
-            sigma_k = np.dot(np.dot(x_mu.T, gamma_diag), x_mu)
-            sigma[k,...] = (sigma_k) / normalizer[k]
+            mu[index_state] = approximate_weighted_median(observations, self._states_distribution_calculation[:,index_state])
 
-            #parameters[k, 1] = math.sqrt(np.sum(x_mu ** 2)) / normalizer[k]
-        for k in range(C):
-            parameters[k,0] = mu[k]
-            parameters[k, 1] = sigma[k,0]
-        """
-        for state_index in range(self._number_of_possible_states):
-            prob_for_state = self._states_distribution_calculation[:, state_index]
-            cst = sum(prob_for_state)
-           # print(cst)
-            mu = np.sum(observations*prob_for_state)/cst
-            #print(mu)
-            x_mu = (observations - mu)*prob_for_state
-            sigma = math.sqrt(np.sum(x_mu**2))/cst
+        for index_state in range(number_of_hidden_states):
 
-            parameters[state_index, 0] = mu
-            parameters[state_index, 1] = sigma
-        """
+            deviations = np.abs(observations - mu[index_state])
+            sigma[index_state] = approximate_weighted_median(deviations, self._states_distribution_calculation[:,index_state])
+
+        for index_state in range(number_of_hidden_states):
+
+            parameters[index_state, 0] = np.nan_to_num(mu[index_state])
+            parameters[index_state, 1] = max(np.nan_to_num(sigma[index_state]),  0.001)
 
         self._parameters = parameters
 
@@ -164,7 +143,6 @@ class GaussianHMM(baseHMM):
         :param observations:
         :return:
         """
-        print("E_step")
 
         number_of_observations = len(observations)
         states_distribution = np.zeros((number_of_observations, self._number_of_possible_states))
@@ -286,9 +264,7 @@ class GaussianHMM(baseHMM):
 
         return new_state
 
-    def _calculate_variational_lower_bound(self,  X, pi, mu, sigma, gamma):
-
-
+    def _calculate_variational_lower_bound(self, observations):
         """
         Each input is numpy array:
         X: (N x d), data points
@@ -299,42 +275,77 @@ class GaussianHMM(baseHMM):
 
         Returns value of variational lower bound
         """
-        N = X.shape[0]  # number of objects
-        C = gamma.shape[1]  # number of clusters
-        d = X.shape[1]  # dimension of each object
 
+        number_of_observations = observations.shape[0]
+        number_of_hidden_states = self._states_distribution_calculation.shape[1]
 
-        loss = 0
-        for cluster_index in range(C):
-            dist = multivariate_normal(mu[k], sigma[k], allow_singular=True)
-            for n in range(N):
-                loss += gamma[n, cluster_index] * (
-                            np.log(pi[cluster_index] + 0.00001) + dist.logpdf(X[n, :]) - np.log(gamma[n, k] + 0.000001))
+        loss_per_observation = np.zeros(number_of_observations)
 
-        loss = np.zeros(N)
-        EPSILON = 1e-10
-        for k in range(C):
-            loss += gamma[:, k] * (np.log(pi[k]) + multivariate_normal.logpdf(X, mean=mu[k, :], cov=sigma[k, ...]) - \
-                                   np.log(gamma[:, k]))
-            # loss+=gamma[:,k]*(np.log(pi[k]*multivariate_normal.pdf(X, mean=mu[k,:], cov=sigma[k,...])+0)-np.log(gamma[:,k]))
-            # loss+=gamma[:,k]*(np.log(pi[k]*gauss_den(X,mu[k,:],sigma[k,...],d)+EPSILON)-np.log(gamma[:,k]+EPSILON))
+        for state_index in range(number_of_hidden_states):
 
-        return np.sum(loss)
+            mu = self._get_mu_for_state(state_index)
+            sigma = self._get_sigma_for_state(state_index)
+            gamma_state = self._states_distribution_calculation[:, state_index]
+
+            entropy = gamma_state * np.log(gamma_state + 1e-6)
+
+            loss_per_observation += gamma_state * norm.logpdf(observations, loc=mu, scale=sigma)
+            loss_per_observation -= entropy
+
+        total_loss = np.sum(loss_per_observation)
+
+        return total_loss
 
     def _calculate_initial_states_distribution(self, observations):
 
         gaussian_clustering_model = GaussianSoftClustering()
         X = np.array([[item] for item in observations])
-        best_loss, best_pi, best_mu, best_sigma, best_gamma = gaussian_clustering_model.train_EM(X, 3, restarts=3)
+        best_loss, best_pi, best_mu, best_sigma, best_gamma = gaussian_clustering_model.train_EM(X, 3, restarts=10)
 
         return best_pi, best_mu, best_sigma, best_gamma
 
     def _train_with_expectation_maximization(self, observations):
 
         max_iterations = 100
+        min_iteration = 5
 
-        for _ in tqdm(range(max_iterations)):
+        previous_loss = self._calculate_variational_lower_bound(observations)
+
+        for iteration in tqdm(range(max_iterations)):
 
             self._do_M_step(observations)
             self._do_E_step(observations)
+            loss = self._calculate_variational_lower_bound(observations)
+            if abs(loss - previous_loss)/previous_loss <= 0.01 and iteration >= min_iteration :
+                break
 
+def normpdf(x, mean, sd):
+
+    var = float(sd) ** 2
+    denom = (2 * math.pi * var) ** .5
+    num = math.exp(-(float(x) - float(mean)) ** 2 / (2 * var))
+    return num / denom
+
+
+def norm_logpdf(x, mean, sd):
+
+    var = float(sd) ** 2
+
+    denom = (2 * math.pi * var) ** .5
+    num = -(float(x) - float(mean)) ** 2 / (2 * var)
+    num = min(num, 1e-6)
+
+    return num - np.log(denom)
+
+def approximate_weighted_median(observations, weights):
+
+    total_weight = sum(weights)
+    indexes_for_sorted_values = np.argsort(observations)
+
+    sorted_values = observations[indexes_for_sorted_values]
+    sorted_weights = weights[indexes_for_sorted_values]/total_weight
+
+    index_upper_median = np.argmax(np.cumsum(sorted_weights) >= 0.5)
+    upper_median = sorted_values[index_upper_median]
+
+    return upper_median
