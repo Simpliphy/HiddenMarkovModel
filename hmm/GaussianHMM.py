@@ -182,6 +182,7 @@ class GaussianHMM(baseHMM):
 
         self._states_distribution_calculation = best_gamma
         self._initialize_transition_matrix(best_gamma)
+        print(best_gamma)
         print(self._transition_probabilitities_calculation)
         self._train_with_expectation_maximization(observations)
 
@@ -343,7 +344,7 @@ class GaussianHMM(baseHMM):
 
     def _train_with_expectation_maximization(self, observations):
 
-        max_iterations = 100
+        max_iterations = 10
         min_iteration = 5
 
         self._do_forward_pass(observations)
