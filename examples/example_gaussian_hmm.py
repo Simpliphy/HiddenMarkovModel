@@ -18,7 +18,7 @@ if __name__=="__main__":
                                                               [0.0, 0.2],
                                                               [3.0, 0.2]])
 
-    result = gaussianHMM.generate_sample(100)
+    result = gaussianHMM.generate_sample(200)
 
     states = result["states"]
     observations = np.array([item for sublist in result["observations"] for item in sublist])

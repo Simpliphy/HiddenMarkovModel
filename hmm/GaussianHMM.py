@@ -33,6 +33,7 @@ class GaussianHMM(baseHMM):
         self._inital_state_calculation = None
         self._transition_probabilitities_calculation = None
         self._states_distribution_calculation = None
+        self._normal_random_variables = None
 
     def generate_sample(self, number_of_data):
         """
@@ -65,52 +66,74 @@ class GaussianHMM(baseHMM):
         :return:
         """
 
-        self._calculate_new_transition_matrix(observations)
+        self._calculate_new_transition_matrix()
         self._calculate_new_emission_probabilities_parameters(observations)
 
-    def _calculate_new_transition_matrix(self, observations):
+    def _calculate_new_transition_matrix(self):
+
+        """
+        alpha = self._alpha
+        beta = self._beta
 
         transition_probababilities = np.zeros((self._number_of_possible_states,
                                                self._number_of_possible_states))
 
-        states_distributions = self._states_distribution_calculation.copy()
+        #states_distributions = self._states_distribution_calculation.copy()
 
-        for index_time_step in range(len(observations) - 1):
+        for index_time_step in range(alpha.shape[0] - 1):
+
+            #probabilties_for_states = np.dot(alpha[index_time_step], self._transition_probabilitities_calculation)
+            #probabilties_for_states = np.dot(probabilties_for_states, beta[index_time_step + 1])
+
             for from_state in range(self._number_of_possible_states):
                 for to_state in range(self._number_of_possible_states):
 
-                    from_state_probability = states_distributions[index_time_step, from_state]
-                    to_state_probability = states_distributions[index_time_step + 1, to_state]
+                    prob = alpha[index_time_step, from_state]
+                    prob *= self._transition_probabilitities_calculation[from_state, to_state]
+                    prob *= beta[index_time_step + 1, to_state]
 
-                    from_state_observation = observations[index_time_step]
-                    to_state_observation = observations[index_time_step + 1]
+                    #from_state_observation = observations[index_time_step]
+                    #to_state_observation = observations[index_time_step + 1]
 
-                    from_state_sigma = self._get_sigma_for_state(from_state)
-                    from_state_mu = self._get_mu_for_state(from_state)
-                    from_state_distribution = norm(loc=from_state_mu, scale=from_state_sigma )
+                    #from_state_sigma = self._get_sigma_for_state(from_state)
+                    #from_state_mu = self._get_mu_for_state(from_state)
+                    #from_state_distribution = norm(loc=from_state_mu, scale=from_state_sigma )
 
-                    to_state_sigma = self._get_sigma_for_state(to_state)
-                    to_state_mu = self._get_mu_for_state(to_state)
-                    to_state_distribution = norm(loc=to_state_mu, scale=to_state_sigma)
+                    #to_state_sigma = self._get_sigma_for_state(to_state)
+                    #to_state_mu = self._get_mu_for_state(to_state)
+                    #to_state_distribution = norm(loc=to_state_mu, scale=to_state_sigma)
 
-                    p_emission_from = np.nan_to_num(from_state_distribution.pdf(from_state_observation))
-                    p_emission_to = np.nan_to_num(to_state_distribution.pdf(to_state_observation))
+                    #p_emission_from = np.nan_to_num(from_state_distribution.pdf(from_state_observation))
+                    #p_emission_to = np.nan_to_num(to_state_distribution.pdf(to_state_observation))
 
-                    probability_from = from_state_probability*p_emission_from
-                    probability_to = to_state_probability*p_emission_to
+                    #probability_from = from_state_probability#*p_emission_from
+                    #probability_to = to_state_probability#*p_emission_to
 
-                    transition_probababilities[from_state, to_state] += probability_from*probability_to
+                    transition_probababilities[from_state, to_state] += prob
 
         transition_probababilities = np.nan_to_num(transition_probababilities)
 
-        random_matrix = np.random.normal(1e-3, 1e-4, transition_probababilities.shape)
-        transition_probababilities = np.maximum(transition_probababilities, random_matrix)
+        #random_matrix = np.random.normal(1e-3, 1e-4, transition_probababilities.shape)
+        #transition_probababilities = np.maximum(transition_probababilities, random_matrix)
 
         row_sums = transition_probababilities.sum(axis=1)
         transition_probababilities = transition_probababilities / row_sums[:, np.newaxis]
 
 
         self._transition_probabilitities_calculation = transition_probababilities
+        """
+        states = np.argmax(self._states_distribution_calculation, axis=1)
+        print(states)
+
+        transition_matrix = np.zeros((self._number_of_possible_states, self._number_of_possible_states))
+
+        for index_time_step in range(self._states_distribution_calculation.shape[0] - 1):
+            transition_matrix[states[index_time_step], states[index_time_step + 1]] += 1
+
+        sum_axis = transition_matrix.sum(axis=1)
+        transition_matrix = transition_matrix / sum_axis[:, np.newaxis]
+
+        self._transition_probabilitities_calculation = transition_matrix
 
     def _calculate_new_emission_probabilities_parameters(self, observations):
 
@@ -143,10 +166,14 @@ class GaussianHMM(baseHMM):
         :param observations:
         :return:
         """
-        alpha  = self._do_forward_pass(observations)
+        alpha = self._do_forward_pass(observations)
         beta = self._do_backward_pass(observations)
         self._states_distribution_calculation = self._combined_forward_and_backward_result(alpha, beta)
         print(return_full_probability(alpha))
+        print(self._states_distribution_calculation)
+        self._alpha = alpha
+        self._beta = beta
+        return return_full_probability(alpha)
 
 
     def fit(self, observations):
@@ -154,9 +181,36 @@ class GaussianHMM(baseHMM):
         best_pi, best_mu, best_sigma, best_gamma = self._calculate_initial_states_distribution(observations)
 
         self._states_distribution_calculation = best_gamma
+        self._initialize_transition_matrix(best_gamma)
+        print(self._transition_probabilitities_calculation)
         self._train_with_expectation_maximization(observations)
 
         return self._states_distribution_calculation, self._transition_probabilitities_calculation, self._parameters
+
+    def _initialize_transition_matrix(self, best_gamma):
+
+        states = np.argmax(best_gamma, axis=1)
+
+        transition_matrix = np.zeros((self._number_of_possible_states, self._number_of_possible_states))
+
+        for index_time_step in range(best_gamma.shape[0] -1 ):
+                transition_matrix[states[index_time_step], states[index_time_step+1]] += 1
+
+        sum_axis = transition_matrix.sum(axis=1)
+        transition_matrix = transition_matrix / sum_axis[:, np.newaxis]
+
+        self._transition_probabilitities_calculation = transition_matrix
+
+    def _initialize_normal_random_variables(self):
+
+        random_variable = list()
+
+        for index_state in range(self._number_of_possible_states):
+
+            random_variable.append(norm(loc=self._get_mu_for_state(index_state),
+                                        scale=self._get_sigma_for_state(index_state)))
+
+        self._normal_random_variables = random_variable
 
     @property
     def initial_state(self):
@@ -292,15 +346,20 @@ class GaussianHMM(baseHMM):
         max_iterations = 100
         min_iteration = 5
 
-        previous_loss = self._calculate_variational_lower_bound(observations)
+        self._do_forward_pass(observations)
+        self._do_backward_pass(observations)
+        self._do_M_step(observations)
+        previous_likelihood = self._do_E_step(observations)
 
         for iteration in tqdm(range(max_iterations)):
 
             self._do_M_step(observations)
-            self._do_E_step(observations)
-            loss = self._calculate_variational_lower_bound(observations)
+            likelihood = self._do_E_step(observations)
+
+            print(likelihood)
             print(self._parameters)
-            if abs(loss - previous_loss)/previous_loss <= 0.01 and iteration >= min_iteration :
+            print(self._transition_probabilitities_calculation)
+            if abs(likelihood - previous_likelihood)/previous_likelihood <= 0.001 and iteration >= min_iteration :
                 break
 
     def _do_forward_pass(self, observations):
@@ -320,10 +379,10 @@ class GaussianHMM(baseHMM):
 
         alpha[0] /= sum(alpha[0])
 
+
         for index_time_step in range(1, number_of_observations):
 
             new_transitional_probabilities = np.dot(alpha[index_time_step-1], self._transition_probabilitities_calculation)
-
             for index_state in range(self._number_of_possible_states):
 
                 state_sigma = self._get_sigma_for_state(index_state)
@@ -336,6 +395,8 @@ class GaussianHMM(baseHMM):
                 probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
 
                 alpha[index_time_step, index_state] = probability_of_state
+
+        self._alpha = alpha
 
         return alpha
 
@@ -355,13 +416,12 @@ class GaussianHMM(baseHMM):
                 prob = norm.logpdf(observations[index_time_step + 1],
                                                      loc=self._get_mu_for_state(index_state),
                                                      scale=self._get_sigma_for_state(index_state))
-                prob = max(np.random.normal(1e-8, 1e-9, 1)[0], np.nan_to_num(prob))
+                prob = min(np.random.normal(1e-8, 1e-9, 1)[0], np.nan_to_num(prob))
                 observation_probabilities[index_state] = math.exp(prob)
 
             new_transitional_probabilities = np.dot(self._transition_probabilitities_calculation,
                                                     observation_probabilities)
 
-            print(new_transitional_probabilities)
             for index_state in range(self._number_of_possible_states):
 
                 probability_of_state = beta[index_time_step + 1, index_state] * new_transitional_probabilities[index_state]
@@ -369,14 +429,17 @@ class GaussianHMM(baseHMM):
 
                 beta[index_time_step, index_state] = probability_of_state
 
+        self._beta = beta
+
         return beta
 
     def _combined_forward_and_backward_result(self, alpha, beta):
 
-        normalization_constant = return_full_probability(alpha)
-        states_distribution = alpha*beta/normalization_constant
+        product = alpha*beta
 
-        print(states_distribution)
+        row_sums = product.sum(axis=1)
+        states_distribution = product / row_sums[:, np.newaxis]
+
         return states_distribution
 
 def return_full_probability(alpha):
@@ -413,4 +476,6 @@ def approximate_weighted_median(observations, weights):
     upper_median = sorted_values[index_upper_median]
 
     return upper_median
+
+
 
