@@ -81,6 +81,10 @@ def test_E_step(gaussian_hmm):
     gaussian_hmm.emission_probabilities_parameters = np.array([[-3.0, 0.4],
                                                               [0.0, 0.2],
                                                               [3.0, 0.2]])
+
+    gaussian_hmm._transition_probabilitities_calculation = np.array([[0.8, 0.1, 0.1],
+                                                     [0.2, 0.6, 0.2],
+                                                     [0.05, 0.05, 0.9]])
     gaussian_hmm._do_E_step(observations)
 
     states_distribution = gaussian_hmm._states_distribution_calculation

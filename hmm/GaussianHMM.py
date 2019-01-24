@@ -1,11 +1,12 @@
 import numpy as np
 import numbers
-from scipy.stats import norm
+from scipy.stats import norm, multivariate_normal
 import math
 from tqdm import tqdm
 
 from hmm.base.baseHMM import baseHMM
 from hmm.GaussianSoftClustering import GaussianSoftClustering
+
 np.random.seed(42)
 
 class GaussianHMM(baseHMM):
@@ -67,7 +68,6 @@ class GaussianHMM(baseHMM):
         self._calculate_new_transition_matrix(observations)
         self._calculate_new_emission_probabilities_parameters(observations)
 
-
     def _calculate_new_transition_matrix(self, observations):
 
         transition_probababilities = np.zeros((self._number_of_possible_states,
@@ -103,7 +103,7 @@ class GaussianHMM(baseHMM):
 
         transition_probababilities = np.nan_to_num(transition_probababilities)
 
-        random_matrix =  np.random.normal(1e-3, 1e-4, transition_probababilities.shape)
+        random_matrix = np.random.normal(1e-3, 1e-4, transition_probababilities.shape)
         transition_probababilities = np.maximum(transition_probababilities, random_matrix)
 
         row_sums = transition_probababilities.sum(axis=1)
@@ -143,28 +143,10 @@ class GaussianHMM(baseHMM):
         :param observations:
         :return:
         """
+        alpha  = self._do_forward_pass(observations)
+        beta = self._do_backward_pass(observations)
+        self._states_distribution_calculation = self._combined_forward_and_backward_result(alpha, beta)
 
-        number_of_observations = len(observations)
-        states_distribution = np.zeros((number_of_observations, self._number_of_possible_states))
-
-        for index_time_step in range(number_of_observations):
-            for index_state in range(self._number_of_possible_states):
-
-                state_sigma = self._get_sigma_for_state(index_state)
-                state_mu = self._get_mu_for_state(index_state)
-
-                state_emission_distribution = norm(loc=state_mu, scale=state_sigma)
-                probability_of_state = state_emission_distribution.pdf(observations[index_time_step])
-
-                probability_of_state = np.nan_to_num(probability_of_state)
-                probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
-
-                states_distribution[index_time_step, index_state] = probability_of_state
-
-        row_sums = states_distribution.sum(axis=1)
-        states_distribution = states_distribution / row_sums[:, np.newaxis]
-
-        self._states_distribution_calculation = states_distribution
 
     def fit(self, observations):
 
@@ -319,6 +301,79 @@ class GaussianHMM(baseHMM):
             if abs(loss - previous_loss)/previous_loss <= 0.01 and iteration >= min_iteration :
                 break
 
+    def _do_forward_pass(self, observations):
+
+        number_of_observations = len(observations)
+        alpha = np.zeros((number_of_observations, self._number_of_possible_states))
+
+        for index_state in range(self._number_of_possible_states):
+            state_sigma = self._get_sigma_for_state(index_state)
+            state_mu = self._get_mu_for_state(index_state)
+
+            state_emission_distribution = norm(loc=state_mu, scale=state_sigma)
+            probability_of_state = state_emission_distribution.pdf(observations[0])
+
+            alpha[0, index_state] = probability_of_state
+
+        alpha[0] /= sum(alpha[0])
+
+        for index_time_step in range(1, number_of_observations):
+
+            new_transitional_probabilities = np.dot(alpha[index_time_step-1], self._transition_probabilitities_calculation)
+
+            for index_state in range(self._number_of_possible_states):
+
+                state_sigma = self._get_sigma_for_state(index_state)
+                state_mu = self._get_mu_for_state(index_state)
+
+                state_emission_distribution = norm(loc=state_mu, scale=state_sigma)
+                probability_of_state = state_emission_distribution.pdf(observations[index_time_step])
+
+                probability_of_state = np.nan_to_num(probability_of_state)*new_transitional_probabilities[index_state]
+                probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
+
+                alpha[index_time_step, index_state] = probability_of_state
+
+        return alpha
+
+    def _do_backward_pass(self, observations):
+
+        number_of_observations = len(observations)
+        beta = np.zeros((number_of_observations, self._number_of_possible_states))
+
+        for index_state in range(self._number_of_possible_states):
+            beta[-1, index_state] = 1.0
+
+        for index_time_step in range(number_of_observations - 2, -1, -1):
+
+            observation_probabilities = np.zeros(self._number_of_possible_states)
+            for index_state in range(self._number_of_possible_states):
+                observation_probabilities[index_state] = norm.pdf(observations[index_time_step + 1],
+                                                     loc=self._get_mu_for_state(index_state),
+                                                     scale=self._get_sigma_for_state(index_state))
+
+            new_transitional_probabilities = np.dot(self._transition_probabilitities_calculation,
+                                                    observation_probabilities)
+
+            for index_state in range(self._number_of_possible_states):
+
+                probability_of_state = beta[index_time_step + 1, index_state] * new_transitional_probabilities[index_state]
+                probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
+
+                beta[index_time_step, index_state] = probability_of_state
+
+        return beta
+
+    def _combined_forward_and_backward_result(self, alpha, beta):
+
+        normalization_constant = return_full_probability(alpha)
+
+        return alpha*beta/normalization_constant
+
+def return_full_probability(alpha):
+    return alpha[-1].sum()
+
+
 def normpdf(x, mean, sd):
 
     var = float(sd) ** 2
@@ -349,3 +404,4 @@ def approximate_weighted_median(observations, weights):
     upper_median = sorted_values[index_upper_median]
 
     return upper_median
+
