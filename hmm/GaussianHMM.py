@@ -146,6 +146,7 @@ class GaussianHMM(baseHMM):
         alpha  = self._do_forward_pass(observations)
         beta = self._do_backward_pass(observations)
         self._states_distribution_calculation = self._combined_forward_and_backward_result(alpha, beta)
+        print(return_full_probability(alpha))
 
 
     def fit(self, observations):
@@ -298,6 +299,7 @@ class GaussianHMM(baseHMM):
             self._do_M_step(observations)
             self._do_E_step(observations)
             loss = self._calculate_variational_lower_bound(observations)
+            print(self._parameters)
             if abs(loss - previous_loss)/previous_loss <= 0.01 and iteration >= min_iteration :
                 break
 
@@ -312,6 +314,7 @@ class GaussianHMM(baseHMM):
 
             state_emission_distribution = norm(loc=state_mu, scale=state_sigma)
             probability_of_state = state_emission_distribution.pdf(observations[0])
+            probability_of_state = max(1e-3, np.nan_to_num(probability_of_state))
 
             alpha[0, index_state] = probability_of_state
 
@@ -348,17 +351,21 @@ class GaussianHMM(baseHMM):
 
             observation_probabilities = np.zeros(self._number_of_possible_states)
             for index_state in range(self._number_of_possible_states):
-                observation_probabilities[index_state] = norm.pdf(observations[index_time_step + 1],
+
+                prob = norm.logpdf(observations[index_time_step + 1],
                                                      loc=self._get_mu_for_state(index_state),
                                                      scale=self._get_sigma_for_state(index_state))
+                prob = max(np.random.normal(1e-8, 1e-9, 1)[0], np.nan_to_num(prob))
+                observation_probabilities[index_state] = math.exp(prob)
 
             new_transitional_probabilities = np.dot(self._transition_probabilitities_calculation,
                                                     observation_probabilities)
 
+            print(new_transitional_probabilities)
             for index_state in range(self._number_of_possible_states):
 
                 probability_of_state = beta[index_time_step + 1, index_state] * new_transitional_probabilities[index_state]
-                probability_of_state = max(probability_of_state, np.random.normal(1e-3, 1e-4, 1)[0])
+                probability_of_state = max(probability_of_state, np.random.normal(1e-4, 1e-5, 1)[0])
 
                 beta[index_time_step, index_state] = probability_of_state
 
@@ -367,8 +374,10 @@ class GaussianHMM(baseHMM):
     def _combined_forward_and_backward_result(self, alpha, beta):
 
         normalization_constant = return_full_probability(alpha)
+        states_distribution = alpha*beta/normalization_constant
 
-        return alpha*beta/normalization_constant
+        print(states_distribution)
+        return states_distribution
 
 def return_full_probability(alpha):
     return alpha[-1].sum()
