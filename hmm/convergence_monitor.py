@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.cm as cm
 
 class ConvergenceMonitor(object):
 
@@ -17,11 +19,8 @@ class ConvergenceMonitor(object):
         for _ in range(number_of_hidden_states):
             lists_sigmas.append(list())
 
-        #print(len(self._parameters_list))
         for iteration_index in range(len(self._parameters_list)):
             for index_state in range(number_of_hidden_states):
-                #print(self._parameters_list[iteration_index])
-                #print(index_state)
                 lists_sigmas[index_state].append(self._parameters_list[iteration_index][index_state, 1])
 
         for index_state in range(number_of_hidden_states):
@@ -63,7 +62,24 @@ class ConvergenceMonitor(object):
         plt.show()
 
     def show_states(self):
-        pass
+
+        data_state = list()
+        for iteration_index in range(len(self._parameters_list)):
+
+           states_distribution = self._states_distributions_list[iteration_index]
+           states = np.argmax(states_distribution, axis=1)
+           data_state.append(states)
+
+        data = np.array(data_state)
+
+        fig, ax = plt.subplots(figsize=(20, 20))
+        ax.imshow(data, cmap=cm.rainbow)
+        ax.grid(which='major', axis='both', linestyle='-', color='k', linewidth=2)
+        ax.set_ylabel("iteration")
+        ax.set_xlabel("time step")
+
+        plt.show()
+
 
     def append(self, parameter, likelihood, iteration,states_distribution, transition_matrix):
 

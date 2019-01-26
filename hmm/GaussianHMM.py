@@ -9,6 +9,7 @@ from hmm.GaussianSoftClustering import GaussianSoftClustering
 from hmm.convergence_monitor import ConvergenceMonitor
 
 np.random.seed(42)
+EPSILON = 1e-6
 
 class GaussianHMM(baseHMM):
 
@@ -37,6 +38,58 @@ class GaussianHMM(baseHMM):
         self._normal_random_variables = None
         self._alpha = None
         self._beta = None
+
+    @property
+    def initial_state(self):
+        return self._initial_state
+
+    @initial_state.setter
+    def initial_state(self, value):
+        assert len(value) > 1, "the initial state must have a length greater than one"
+        assert isinstance(value, np.ndarray), "the initial state must be an numpy array"
+        assert (sum(value) == 1 and max(value) == 1), "only one value must be one"
+
+        self._initial_state = value
+
+    @property
+    def transition_probabilities(self):
+        return self._transition_probabilitities
+
+    @transition_probabilities.setter
+    def transition_probabilities(self, transition_matrix):
+
+        # TODO check square and size
+        assert isinstance(transition_matrix, np.ndarray), "the initial state must be an numpy array"
+
+        for line in transition_matrix:
+            assert sum(line) == 1.0, "the line mut sum to one"
+
+        assert transition_matrix.min() >= 0, "all value must be positive"
+        assert transition_matrix.max() <= 1, "all value must be lower or equal to one"
+
+        self._transition_probabilitities = transition_matrix
+
+    @property
+    def emission_probabilities_parameters(self):
+        return self._parameters
+
+    @emission_probabilities_parameters.setter
+    def emission_probabilities_parameters(self, parameters):
+        """
+        The expected format is a list. Element is a combinaison [mu, sigma]. The values are real numbers.
+
+        :param parameters:
+        :return:
+        """
+        assert isinstance(parameters, np.ndarray), "A numpy array is expected"
+        for combinaison in parameters:
+            assert len(combinaison) == 2, "Two elements are expected per state"
+            assert combinaison[1] >= 0, "The sigma must be positive"
+            assert isinstance(combinaison[0], numbers.Real), "The mean (mu) must be a real number"
+            assert isinstance(combinaison[1], numbers.Real), "The std deviation (sigma) must be a real number"
+
+        self._parameters = parameters
+
 
     def generate_sample(self, number_of_data):
         """
@@ -96,8 +149,8 @@ class GaussianHMM(baseHMM):
 
                     prob = alpha[index_time_step, from_state]
                     prob *= self._transition_probabilitities_calculation[from_state, to_state]
-                    prob *= np.exp(self._normal_random_variables[to_state].logpdf(observations[index_time_step+1])
-                                   + 1e-6)
+                    logprob = np.nan_to_num(self._normal_random_variables[to_state].logpdf(observations[index_time_step+1]))
+                    prob *= np.exp(logprob + EPSILON)
                     prob *= beta[index_time_step + 1, to_state]
 
                     xi[index_time_step, from_state, to_state] += prob
@@ -108,7 +161,6 @@ class GaussianHMM(baseHMM):
 
         row_sums = transition_probababilities.sum(axis=1)
         transition_probababilities = transition_probababilities / row_sums[:, np.newaxis]
-
 
         self._transition_probabilitities_calculation = transition_probababilities
 
@@ -123,17 +175,18 @@ class GaussianHMM(baseHMM):
         plot_observations_with_states(observations, states, ax=ax1)
         plt.show()
 
-        #states = np.argmax(self._states_distribution_calculation, axis=1)
-
         for index_state in range(self._number_of_possible_states):
 
             weights_for_state = self._states_distribution_calculation[:, index_state]
             normalization_constant = weights_for_state.sum()
 
-            mu = np.sum(observations*weights_for_state)/normalization_constant
+            #mu = np.sum(observations*weights_for_state)/normalization_constant
+            mu = approximate_weighted_median(observations, weights_for_state)
             self._parameters[index_state][0] = mu
 
             sigma = approximate_weighted_median(np.abs(observations - mu), weights_for_state)
+            #variance = np.sum(weights_for_state*(observations - mu)**2)/normalization_constant
+            #sigma = math.sqrt(variance)
             self._parameters[index_state][1] = sigma
 
     def _do_E_step(self, observations):
@@ -143,14 +196,9 @@ class GaussianHMM(baseHMM):
         :param observations:
         :return:
         """
-        alpha = self._do_forward_pass(observations)
-        beta = self._do_backward_pass(observations)
-        self._states_distribution_calculation = self._combined_forward_and_backward_result(alpha, beta)
-        self._alpha = alpha
-        self._beta = beta
+        self._states_distribution_calculation = self._combined_forward_and_backward_result()
 
-        return return_full_probability(alpha)
-
+        return return_full_probability(self._alpha)
 
     def fit(self, observations):
 
@@ -177,8 +225,6 @@ class GaussianHMM(baseHMM):
 
         self._transition_probabilitities_calculation = transition_matrix
 
-        print("initial transition matrix")
-        print(transition_matrix)
 
     def _initialize_normal_random_variables(self):
 
@@ -190,57 +236,6 @@ class GaussianHMM(baseHMM):
                                         scale=self._get_sigma_for_state(index_state)))
 
         self._normal_random_variables = random_variable
-
-    @property
-    def initial_state(self):
-       return self._initial_state
-
-    @initial_state.setter
-    def initial_state(self, value):
-        assert len(value) > 1, "the initial state must have a length greater than one"
-        assert isinstance(value, np.ndarray), "the initial state must be an numpy array"
-        assert (sum(value) == 1 and max(value) == 1), "only one value must be one"
-
-        self._initial_state = value
-
-    @property
-    def transition_probabilities(self):
-        return self._transition_probabilitities
-
-    @transition_probabilities.setter
-    def transition_probabilities(self, transition_matrix):
-
-        # TODO check square and size
-        assert isinstance(transition_matrix, np.ndarray), "the initial state must be an numpy array"
-
-        for line in transition_matrix:
-            assert sum(line) == 1.0, "the line mut sum to one"
-
-        assert transition_matrix.min() >= 0, "all value must be positive"
-        assert transition_matrix.max() <= 1, "all value must be lower or equal to one"
-
-        self._transition_probabilitities = transition_matrix
-
-    @property
-    def emission_probabilities_parameters(self):
-        return self._parameters
-
-    @emission_probabilities_parameters.setter
-    def emission_probabilities_parameters(self, parameters):
-        """
-        The expected format is a list. Element is a combinaison [mu, sigma]. The values are real numbers.
-
-        :param parameters:
-        :return:
-        """
-        assert isinstance(parameters, np.ndarray), "A numpy array is expected"
-        for combinaison in parameters:
-            assert len(combinaison) == 2, "Two elements are expected per state"
-            assert combinaison[1] >= 0, "The sigma must be positive"
-            assert isinstance(combinaison[0], numbers.Real), "The mean (mu) must be a real number"
-            assert isinstance(combinaison[1], numbers.Real), "The std deviation (sigma) must be a real number"
-
-        self._parameters = parameters
 
     def _is_ready_to_generate_sample(self):
 
@@ -321,8 +316,8 @@ class GaussianHMM(baseHMM):
         best_loss, best_pi, best_mu, best_sigma, best_gamma = gaussian_clustering_model.train_EM(X,
                                                                                                  number_of_clusters=k,
                                                                                                  rtol=1e-5,
-                                                                                                 max_iter=200,
-                                                                                                 restarts=100)
+                                                                                                 max_iter=100,
+                                                                                                 restarts=40)
 
         return best_pi, best_mu, best_sigma, best_gamma
 
@@ -335,7 +330,6 @@ class GaussianHMM(baseHMM):
         self._do_M_step(observations)
         previous_likelihood = self._do_E_step(observations)
 
-
         convergence_monitor = ConvergenceMonitor()
         convergence_monitor.append(self._parameters,
                                    previous_likelihood,
@@ -344,12 +338,6 @@ class GaussianHMM(baseHMM):
                                    self._transition_probabilitities_calculation)
 
         for iteration in tqdm(range(max_iterations)):
-
-            print("transition matrix")
-            print(self._transition_probabilitities_calculation)
-
-            print("parameters")
-            print(self._parameters)
 
             self._do_M_step(observations)
             likelihood = self._do_E_step(observations)
@@ -365,6 +353,7 @@ class GaussianHMM(baseHMM):
         convergence_monitor.show_sigmas()
         convergence_monitor.show_mus()
         convergence_monitor.show_likelihood()
+        convergence_monitor.show_states()
 
     def _do_forward_pass(self, observations):
 
@@ -374,11 +363,10 @@ class GaussianHMM(baseHMM):
         for index_state in range(self._number_of_possible_states):
 
             logprob = self._normal_random_variables[index_state].logpdf(observations[0])
-            probability_of_state = np.exp(logprob + 1e-6)
+            probability_of_state = np.exp(np.nan_to_num(logprob) + EPSILON)
             alpha[0, index_state] = probability_of_state
 
         alpha[0] /= sum(alpha[0])
-
 
         for index_time_step in range(1, number_of_observations):
 
@@ -386,14 +374,12 @@ class GaussianHMM(baseHMM):
             for index_state in range(self._number_of_possible_states):
 
                 logprob = self._normal_random_variables[index_state].logpdf(observations[index_time_step])
-                probability_of_state = np.exp(logprob + 1e-6)
+                probability_of_state = np.exp(np.nan_to_num(logprob) + EPSILON)
 
                 probability_of_state = probability_of_state*new_transitional_probabilities[index_state]
                 alpha[index_time_step, index_state] = probability_of_state
 
         self._alpha = alpha
-
-        return alpha
 
     def _do_backward_pass(self, observations):
 
@@ -408,11 +394,11 @@ class GaussianHMM(baseHMM):
             observation_probabilities = np.zeros(self._number_of_possible_states)
             for index_state in range(self._number_of_possible_states):
 
-                prob = norm.logpdf(observations[index_time_step + 1],
+                logprob = norm.logpdf(observations[index_time_step + 1],
                                                      loc=self._get_mu_for_state(index_state),
                                                      scale=self._get_sigma_for_state(index_state))
 
-                observation_probabilities[index_state] = math.exp(prob + 1e-6)
+                observation_probabilities[index_state] = math.exp(np.nan_to_num(logprob) + EPSILON)
 
             new_transitional_probabilities = np.dot(self._transition_probabilitities_calculation,
                                                     observation_probabilities)
@@ -424,9 +410,14 @@ class GaussianHMM(baseHMM):
 
         self._beta = beta
 
-        return beta
 
-    def _combined_forward_and_backward_result(self, alpha, beta):
+    def _combined_forward_and_backward_result(self):
+
+        assert self._alpha is not None, "The attribute self._alpha must have been calculate using the forward pass"
+        assert self._beta is not None, "The attribute self._beta must have been calculate using the backward pass"
+
+        alpha = self._alpha
+        beta = self._beta
 
         product = alpha*beta
 
