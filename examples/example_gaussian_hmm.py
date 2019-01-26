@@ -25,6 +25,7 @@ if __name__=="__main__":
 
     states_distribution_calculation, transition_probabilitities, parameters = gaussianHMM.fit(observations)
 
+    print(states)
     states_obtain = np.argmax(states_distribution_calculation, axis=1)
 
     f, (ax1, ax2) = plt.subplots(1, 2)

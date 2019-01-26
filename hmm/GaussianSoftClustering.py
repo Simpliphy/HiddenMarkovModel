@@ -107,39 +107,44 @@ class GaussianSoftClustering(object):
         best_loss = -1e7
         best_parameters = GaussianSoftClusteringParameters()
 
-        for _ in range(restarts):
+        for _ in tqdm(range(restarts)):
 
-            parameters = GaussianSoftClusteringParameters()
-            parameters.initialize_parameters( number_of_clusters, number_of_features, number_of_observations)
+            try:
+                parameters = GaussianSoftClusteringParameters()
+                parameters.initialize_parameters( number_of_clusters, number_of_features, number_of_observations)
 
-            parameters.gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
+                parameters.gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
 
-            prev_loss = self.compute_vlb(observations,
-                                         parameters.pi,
-                                         parameters.mu,
-                                         parameters.sigma,
-                                         parameters.gamma)
+                prev_loss = self.compute_vlb(observations,
+                                             parameters.pi,
+                                             parameters.mu,
+                                             parameters.sigma,
+                                             parameters.gamma)
 
-            for _ in tqdm(range(max_iter)):
+                for _ in range(max_iter):
 
-                gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
-                parameters.pi, parameters.mu, parameters.sigma = self.M_step(observations, gamma)
+                    gamma = self.E_step(observations, parameters.pi, parameters.mu, parameters.sigma)
+                    parameters.pi, parameters.mu, parameters.sigma = self.M_step(observations, gamma)
 
-                loss = self.compute_vlb(observations,
-                                        parameters.pi,
-                                        parameters.mu,
-                                        parameters.sigma,
-                                        parameters.gamma)
+                    loss = self.compute_vlb(observations,
+                                            parameters.pi,
+                                            parameters.mu,
+                                            parameters.sigma,
+                                            parameters.gamma)
 
-                if loss / prev_loss < rtol:
-                    break
+                    if loss / prev_loss < rtol:
+                        break
 
-                if loss > best_loss:
+                    if loss > best_loss:
 
-                    best_loss = loss
-                    best_parameters = parameters
+                        best_loss = loss
+                        best_parameters = parameters
 
-                prev_loss = loss
+                    prev_loss = loss
+
+            except np.linalg.LinAlgError:
+                print("Singular matrix: components collapsed")
+                pass
 
         return best_loss, best_parameters.pi, best_parameters.mu, best_parameters.sigma, best_parameters.gamma
 

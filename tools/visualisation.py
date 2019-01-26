@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_observations_with_states(observations, states, ax = None):
+def plot_observations_with_states(observations, states, ax=None):
 
     if not isinstance(observations, np.ndarray):
         observations = np.array(observations)
