@@ -135,6 +135,9 @@ class GaussianHMM(baseHMM):
         if self._beta is None:
             self._do_backward_pass(observations)
 
+        if self._normal_random_variables is None:
+            self._initialize_normal_random_variables()
+
         alpha = self._alpha
         beta = self._beta
 
@@ -167,13 +170,13 @@ class GaussianHMM(baseHMM):
 
     def _calculate_new_emission_probabilities_parameters(self, observations):
 
-        from tools.visualisation import plot_observations_with_states
-        import matplotlib.pyplot as plt
+        #from tools.visualisation import plot_observations_with_states
+        #import matplotlib.pyplot as plt
 
-        states = np.argmax(self._states_distribution_calculation, axis=1)
-        f, ax1 = plt.subplots()
-        plot_observations_with_states(observations, states, ax=ax1)
-        plt.show()
+        #states = np.argmax(self._states_distribution_calculation, axis=1)
+        #f, ax1 = plt.subplots()
+        #plot_observations_with_states(observations, states, ax=ax1)
+        #plt.show()
 
         for index_state in range(self._number_of_possible_states):
 
@@ -196,6 +199,12 @@ class GaussianHMM(baseHMM):
         :param observations:
         :return:
         """
+        if self._alpha is None:
+            self._do_forward_pass(observations)
+
+        if self._beta is None:
+            self._do_backward_pass(observations)
+            
         self._states_distribution_calculation = self._combined_forward_and_backward_result()
 
         return return_full_probability(self._alpha)
@@ -317,7 +326,7 @@ class GaussianHMM(baseHMM):
                                                                                                  number_of_clusters=k,
                                                                                                  rtol=1e-5,
                                                                                                  max_iter=100,
-                                                                                                 restarts=40)
+                                                                                                 restarts=100)
 
         return best_pi, best_mu, best_sigma, best_gamma
 
@@ -357,6 +366,9 @@ class GaussianHMM(baseHMM):
 
     def _do_forward_pass(self, observations):
 
+        if self._normal_random_variables is None:
+            self._initialize_normal_random_variables()
+
         number_of_observations = len(observations)
         alpha = np.zeros((number_of_observations, self._number_of_possible_states))
 
@@ -382,6 +394,9 @@ class GaussianHMM(baseHMM):
         self._alpha = alpha
 
     def _do_backward_pass(self, observations):
+
+        if self._normal_random_variables is None:
+            self._initialize_normal_random_variables()
 
         number_of_observations = len(observations)
         beta = np.zeros((number_of_observations, self._number_of_possible_states))

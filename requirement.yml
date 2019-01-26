@@ -1,0 +1,11 @@
+name: env_HMM
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.6
+  - numpy
+  - matplotlib
+  - tqdm
+  - scipy
+  - pytest
+  - numbers

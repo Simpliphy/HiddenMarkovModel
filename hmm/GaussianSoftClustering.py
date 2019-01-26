@@ -1,8 +1,7 @@
 import numpy as np
 from scipy.stats import multivariate_normal
-import math
-from numpy.linalg import det
 from tqdm import tqdm
+
 from hmm.GaussianSoftClusteringParameters import GaussianSoftClusteringParameters
 
 class GaussianSoftClustering(object):
