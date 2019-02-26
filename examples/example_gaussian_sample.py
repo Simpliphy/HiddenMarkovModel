@@ -1,6 +1,6 @@
 import numpy as np
 
-from hmm.GaussianHMM import GaussianHMM
+from hmm.gaussian.GaussianHMM import GaussianHMM
 from tools.visualisation import plot_observations_with_states
 
 if __name__=="__main__":

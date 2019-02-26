@@ -1,12 +1,12 @@
 import numpy as np
 import numbers
-from scipy.stats import norm, multivariate_normal
+from scipy.stats import norm
 import math
 from tqdm import tqdm
 
 from hmm.base.baseHMM import baseHMM
-from hmm.GaussianSoftClustering import GaussianSoftClustering
-from hmm.convergence_monitor import ConvergenceMonitor
+from hmm.gaussian.GaussianSoftClustering import GaussianSoftClustering
+from hmm.gaussian.convergence_monitor import ConvergenceMonitor
 
 np.random.seed(42)
 EPSILON = 1e-6

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from hmm.GaussianHMM import GaussianHMM
+from hmm.gaussian.GaussianHMM import GaussianHMM
 
 
 @pytest.fixture(scope='module')

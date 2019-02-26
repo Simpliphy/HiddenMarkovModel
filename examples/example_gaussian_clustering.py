@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from hmm.GaussianSoftClustering import GaussianSoftClustering
+from hmm.gaussian.GaussianSoftClustering import GaussianSoftClustering
 
 if __name__=="__main__":
 

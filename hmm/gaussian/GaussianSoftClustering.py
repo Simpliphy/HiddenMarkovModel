@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import multivariate_normal
 from tqdm import tqdm
 
-from hmm.GaussianSoftClusteringParameters import GaussianSoftClusteringParameters
+from hmm.gaussian.GaussianSoftClusteringParameters import GaussianSoftClusteringParameters
 
 class GaussianSoftClustering(object):
     """
@@ -14,6 +14,7 @@ class GaussianSoftClustering(object):
         pass
 
     def E_step(self, observations, pi, mu, sigma):
+
         """
         Performs E-step on GMM model
         # P(t|x)=p(x|t)p(t)/z
@@ -92,14 +93,15 @@ class GaussianSoftClustering(object):
         return total_loss
 
     def train_EM(self, observations, number_of_clusters, rtol=1e-3, max_iter=100, restarts=10):
+
         '''
         Starts with random initialization *restarts* times
         Runs optimization until saturation with *rtol* reached
         or *max_iter* iterations were made.
 
         X: (N, d), data points
-        C: int, number of clusters
         '''
+
         number_of_features = observations.shape[1]  # dimension of each object
         number_of_observations = observations.shape[0]
 
